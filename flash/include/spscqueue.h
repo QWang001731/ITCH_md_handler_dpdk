@@ -8,13 +8,14 @@
 #include <vector>
 
 template <typename T>
-class SPSCQueue {
+class SPSCQueue
+{
 public:
     explicit SPSCQueue(size_t capacity);
     ~SPSCQueue();
 
-    bool enqueue(const T& item);
-    bool dequeue(T& item);
+    bool enqueue(const T &item);
+    bool dequeue(T &item);
 
 private:
     std::vector<T> buffer;
@@ -22,7 +23,5 @@ private:
     std::atomic<size_t> tail;
     const size_t capacity;
 };
-
-#include "spscqueue.tpp"
 
 #endif // SPSCQUEUE_H

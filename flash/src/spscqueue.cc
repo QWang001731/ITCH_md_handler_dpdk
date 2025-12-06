@@ -1,21 +1,23 @@
-Here are the contents for the file /orderbook-project/orderbook-project/src/spscqueue.cc:
-
 #include "spscqueue.h"
 
 template <typename T>
-SPSCQueue<T>::SPSCQueue(size_t capacity) : capacity(capacity), head(0), tail(0) {
+SPSCQueue<T>::SPSCQueue(size_t capacity) : capacity(capacity), head(0), tail(0)
+{
     buffer = new T[capacity];
 }
 
 template <typename T>
-SPSCQueue<T>::~SPSCQueue() {
+SPSCQueue<T>::~SPSCQueue()
+{
     delete[] buffer;
 }
 
 template <typename T>
-bool SPSCQueue<T>::enqueue(const T& item) {
+bool SPSCQueue<T>::enqueue(const T &item)
+{
     size_t next = (head + 1) % capacity;
-    if (next == tail) {
+    if (next == tail)
+    {
         return false; // Queue is full
     }
     buffer[head] = item;
@@ -24,8 +26,10 @@ bool SPSCQueue<T>::enqueue(const T& item) {
 }
 
 template <typename T>
-bool SPSCQueue<T>::dequeue(T& item) {
-    if (head == tail) {
+bool SPSCQueue<T>::dequeue(T &item)
+{
+    if (head == tail)
+    {
         return false; // Queue is empty
     }
     item = buffer[tail];
