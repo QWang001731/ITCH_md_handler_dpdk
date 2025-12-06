@@ -108,8 +108,10 @@ public:
     OrderBook();
     void addOrder(uint64_t id, const std::string &side_str, int32_t price, int32_t qty);
     void orderExecuted(uint64_t id, int32_t qty);
-    void removeOrder(uint64_t id);
-    std::vector<Order> getOrders() const;
+    void orderCancel(uint64_t id, int32_t qty);
+    void orderCancelReplace(uint64_t oldId, uint64_t newId, int32_t newPrice, int32_t qty);
+    void orderDelete(uint64_t id);
+    const std::unordered_map<OrderId, Order *> &getOrders() const { return orders; };
 };
 
 #endif // ORDERBOOK_H

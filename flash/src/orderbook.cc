@@ -54,7 +54,94 @@ void orderBook::orderExecuted(uint64_t id, int32_t qty)
     }
 }
 
-void orderBook::removeOrder(uint64_t id)
+void orderBook::orderCanceled(uint64_t id, int32_t qty)
+{
+    auto it = orders.find(id);
+    if (it != orders.end())
+    {
+        Order *order = it->second;
+        if (order->qty >= qty)
+        {
+            order->qty -= qty;
+            if (order->level)
+            {
+                order->level->total_qty -= qty;
+            }
+        }
+    }
+}
+
+void orderBook::orderCancel(uint64_t id, int32_t qty)
+{
+    auto it = orders.find(id);
+    if (it != orders.end())
+    {
+        Order *order = it->second;
+        if (order->qty >= qty)
+        {
+            order->qty -= qty;
+            if (order->level)
+            {
+                order->level->total_qty -= qty;
+            }
+        }
+    }
+}
+
+void orderBook::orderCancelReplace(uint64_t oldId, uint64_t newId, int32_t newPrice, int32_t qty)
+{
+    auto it = orders.find(oldId);
+    if (it != orders.end())
+    {
+        Order *oldOrder = it->second;
+        Side side = oldOrder->side;
+        // Remove old order
+        if (oldOrder->level)
+        {
+            oldOrder->level->total_qty -= oldOrder->qty;
+            // Remove from linked list
+            if (oldOrder->prev)
+            {
+                oldOrder->prev->next = oldOrder->next;
+            }
+            if (oldOrder->next)
+            {
+                oldOrder->next->prev = oldOrder->prev;
+            }
+            if (oldOrder->level->head == oldOrder)
+            {
+                oldOrder->level->head = oldOrder->next;
+            }
+            if (oldOrder->level->tail == oldOrder)
+            {
+                oldOrder->level->tail = oldOrder->prev;
+            }
+        }
+        orders.erase(it);
+
+        // Add new order
+        Order *newOrder = new Order(newId, side, newPrice, qty);
+        orders[newId] = newOrder;
+        if (side == Side::BUY)
+        {
+            if (bids.find(newPrice) == bids.end())
+            {
+                bids[newPrice] = new PriceLevel(newPrice);
+            }
+            bids[newPrice]->append(newOrder);
+        }
+        else
+        {
+            if (asks.find(newPrice) == asks.end())
+            {
+                asks[newPrice] = new PriceLevel(newPrice);
+            }
+            asks[newPrice]->append(newOrder);
+        }
+    }
+}
+
+void orderBook::orderDelete(uint64_t id)
 {
     auto it = orders.find(id);
     if (it != orders.end())
