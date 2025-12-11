@@ -1,48 +1,48 @@
-#include "orderbook.h"
-#include <vector>
+#include "OrderBook.h"
 #include <algorithm>
 
 OrderBook::OrderBook() {}
 
+// Updated to use shared_ptr for orders and price levels consistently
 void OrderBook::addOrder(uint64_t id, const std::string &side_str, int32_t price, int32_t qty)
 {
     Side side = (side_str == "Buy") ? Side::BUY : Side::SELL;
-    Order newOrder(id, side, price, qty);
-    orders[id] = &newOrder;
+    orders[id] = new Order(id, side, price, qty);
+    int32_t idx = (price - min_price_cents);
     if (side == Side::BUY)
     {
-        if (bids.find(price) == bids.end())
+        if (bids[idx] == nullptr)
         {
-            bids[price] = new PriceLevel(price);
+            bids[idx] = new PriceLevel(price);
         }
-        bids[price]->append(&newOrder);
+        bids[idx]->append(orders[id]);
         if (best_bid_price < price)
         {
             best_bid_price = price;
-            best_bid_qty = bids[price]->total_qty.load();
+            best_bid_qty = bids[idx]->total_qty.load();
         }
     }
     else
     {
-        if (asks.find(price) == asks.end())
+        if (asks[idx] == nullptr)
         {
-            asks[price] = new PriceLevel(price);
+            asks[idx] = new PriceLevel(price);
         }
-        asks[price]->append(&newOrder);
+        asks[idx]->append(orders[id]);
         if (best_ask_price > price || best_ask_price == 0)
         {
             best_ask_price = price;
-            best_ask_qty = asks[price]->total_qty.load();
+            best_ask_qty = asks[idx]->total_qty.load();
         }
     }
 }
 
-void orderBook::orderExecuted(uint64_t id, int32_t qty)
+void OrderBook::orderExecuted(uint64_t id, int32_t qty)
 {
     auto it = orders.find(id);
     if (it != orders.end())
     {
-        Order *order = it->second;
+        auto order = it->second; // shared_ptr<Order>
         if (order->qty >= qty)
         {
             order->qty -= qty;
@@ -54,13 +54,13 @@ void orderBook::orderExecuted(uint64_t id, int32_t qty)
     }
 }
 
-void orderBook::orderCanceled(uint64_t id, int32_t qty)
+void OrderBook::orderCancel(uint64_t id, int32_t qty)
 {
     auto it = orders.find(id);
     if (it != orders.end())
     {
-        Order *order = it->second;
-        if (order->qty >= qty)
+        auto order = it->second; // shared_ptr<Order>
+        if (order->qty > qty)
         {
             order->qty -= qty;
             if (order->level)
@@ -68,108 +68,94 @@ void orderBook::orderCanceled(uint64_t id, int32_t qty)
                 order->level->total_qty -= qty;
             }
         }
-    }
-}
-
-void orderBook::orderCancel(uint64_t id, int32_t qty)
-{
-    auto it = orders.find(id);
-    if (it != orders.end())
-    {
-        Order *order = it->second;
-        if (order->qty >= qty)
+        else
         {
-            order->qty -= qty;
+            // remove whole order
             if (order->level)
             {
-                order->level->total_qty -= qty;
+                order->level->remove(order.get());
             }
+            orders.erase(it);
         }
     }
 }
 
-void orderBook::orderCancelReplace(uint64_t oldId, uint64_t newId, int32_t newPrice, int32_t qty)
+void OrderBook::orderCancelReplace(uint64_t oldId, uint64_t newId, int32_t newPrice, int32_t qty)
 {
     auto it = orders.find(oldId);
     if (it != orders.end())
     {
-        Order *oldOrder = it->second;
+        auto oldOrder = it->second; // shared_ptr<Order>
         Side side = oldOrder->side;
-        // Remove old order
+
+        // Remove old order from its price level (if any)
         if (oldOrder->level)
         {
-            oldOrder->level->total_qty -= oldOrder->qty;
-            // Remove from linked list
-            if (oldOrder->prev)
-            {
-                oldOrder->prev->next = oldOrder->next;
-            }
-            if (oldOrder->next)
-            {
-                oldOrder->next->prev = oldOrder->prev;
-            }
-            if (oldOrder->level->head == oldOrder)
-            {
-                oldOrder->level->head = oldOrder->next;
-            }
-            if (oldOrder->level->tail == oldOrder)
-            {
-                oldOrder->level->tail = oldOrder->prev;
-            }
+            oldOrder->level->remove(oldOrder.get());
         }
+
+        // erase old order
         orders.erase(it);
 
         // Add new order
-        Order *newOrder = new Order(newId, side, newPrice, qty);
+        auto newOrder = std::make_shared<Order>(newId, side, newPrice, qty);
         orders[newId] = newOrder;
+
         if (side == Side::BUY)
         {
             if (bids.find(newPrice) == bids.end())
             {
-                bids[newPrice] = new PriceLevel(newPrice);
+                bids[newPrice] = std::make_shared<PriceLevel>(newPrice);
             }
-            bids[newPrice]->append(newOrder);
+            bids[newPrice]->append(newOrder.get());
         }
         else
         {
             if (asks.find(newPrice) == asks.end())
             {
-                asks[newPrice] = new PriceLevel(newPrice);
+                asks[newPrice] = std::make_shared<PriceLevel>(newPrice);
             }
-            asks[newPrice]->append(newOrder);
+            asks[newPrice]->append(newOrder.get());
         }
     }
 }
 
-void orderBook::orderDelete(uint64_t id)
+void OrderBook::orderDelete(uint64_t id)
 {
     auto it = orders.find(id);
     if (it != orders.end())
     {
-        Order *order = it->second;
-        PriceLevel *level = order->level;
-        if (level)
+        auto order = it->second; // shared_ptr<Order>
+        if (order->level)
         {
-            // Update total quantity
-            level->total_qty -= order->qty;
-            // Remove order from linked list
-            if (order->prev)
-            {
-                order->prev->next = order->next;
-            }
-            if (order->next)
-            {
-                order->next->prev = order->prev;
-            }
-            if (level->head == order)
-            {
-                level->head = order->next;
-            }
-            if (level->tail == order)
-            {
-                level->tail = order->prev;
-            }
+            order->level->remove(order.get());
         }
         orders.erase(it);
+    }
+}
+
+void OrderBook::trade_non_cross(uint64_t orderId, int32_t price, int32_t qty)
+{
+    auto it = orders.find(orderId);
+    if (it != orders.end())
+    {
+        auto order = it->second; // shared_ptr<Order>
+        if (order->qty > qty)
+        {
+            order->qty -= qty;
+            if (order->level)
+            {
+                order->level->total_qty -= qty;
+            }
+        }
+        else if (order->qty == qty)
+        {
+            // remove whole order
+            if (order->level)
+            {
+                order->level->remove(order.get());
+            }
+            orders.erase(it);
+        }
     }
 }
