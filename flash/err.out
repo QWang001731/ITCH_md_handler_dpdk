@@ -1,0 +1,66 @@
+./test_orderbook
+Running main() from /private/tmp/googletest-20250808-4780-aa0gxy/googletest-1.17.0/googletest/src/gtest_main.cc
+[==========] Running 12 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 12 tests from OrderBookTest
+[ RUN      ] OrderBookTest.AddBuyOrder
+addOrder called: id=1 price=100
+Created order, calling insert...
+[       OK ] OrderBookTest.AddBuyOrder (0 ms)
+[ RUN      ] OrderBookTest.AddSellOrder
+addOrder called: id=2 price=150
+Created order, calling insert...
+[       OK ] OrderBookTest.AddSellOrder (0 ms)
+[ RUN      ] OrderBookTest.AddMultipleOrders
+addOrder called: id=1 price=100
+Created order, calling insert...
+addOrder called: id=2 price=105
+Created order, calling insert...
+addOrder called: id=3 price=110
+Created order, calling insert...
+[       OK ] OrderBookTest.AddMultipleOrders (0 ms)
+[ RUN      ] OrderBookTest.PartialCancelOrder
+addOrder called: id=1 price=100
+Created order, calling insert...
+[       OK ] OrderBookTest.PartialCancelOrder (0 ms)
+[ RUN      ] OrderBookTest.FullCancelOrder
+addOrder called: id=1 price=100
+Created order, calling insert...
+[       OK ] OrderBookTest.FullCancelOrder (0 ms)
+[ RUN      ] OrderBookTest.PartialExecute
+addOrder called: id=1 price=100
+Created order, calling insert...
+[       OK ] OrderBookTest.PartialExecute (0 ms)
+[ RUN      ] OrderBookTest.FullExecute
+addOrder called: id=1 price=100
+Created order, calling insert...
+[       OK ] OrderBookTest.FullExecute (0 ms)
+[ RUN      ] OrderBookTest.DeleteOrder
+addOrder called: id=1 price=100
+Created order, calling insert...
+[       OK ] OrderBookTest.DeleteOrder (0 ms)
+[ RUN      ] OrderBookTest.CancelReplace
+addOrder called: id=1 price=100
+Created order, calling insert...
+[       OK ] OrderBookTest.CancelReplace (0 ms)
+[ RUN      ] OrderBookTest.BestBidTracking
+addOrder called: id=1 price=100
+Created order, calling insert...
+addOrder called: id=2 price=105
+Created order, calling insert...
+[       OK ] OrderBookTest.BestBidTracking (0 ms)
+[ RUN      ] OrderBookTest.BestAskTracking
+addOrder called: id=1 price=150
+Created order, calling insert...
+addOrder called: id=2 price=145
+Created order, calling insert...
+[       OK ] OrderBookTest.BestAskTracking (0 ms)
+[ RUN      ] OrderBookTest.PriceOutOfRange
+addOrder called: id=1 price=20000
+Price out of range
+[       OK ] OrderBookTest.PriceOutOfRange (0 ms)
+[----------] 12 tests from OrderBookTest (5 ms total)
+
+[----------] Global test environment tear-down
+[==========] 12 tests from 1 test suite ran. (6 ms total)
+[  PASSED  ] 12 tests.

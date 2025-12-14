@@ -1,15 +1,14 @@
 #include "spscqueue.h"
 
 template <typename T>
-SPSCQueue<T>::SPSCQueue(size_t capacity) : capacity(capacity), head(0), tail(0)
+SPSCQueue<T>::SPSCQueue(size_t capacity) : head(0), tail(0), capacity(capacity)
 {
-    buffer = new T[capacity];
+    buffer.resize(capacity);
 }
 
 template <typename T>
 SPSCQueue<T>::~SPSCQueue()
 {
-    delete[] buffer;
 }
 
 template <typename T>

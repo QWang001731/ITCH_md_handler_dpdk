@@ -1,25 +1,81 @@
 #ifndef OrderBook_H
 #define OrderBook_H
 
+#include "spscqueue.h"
 #include <vector>
 #include <string>
 #include <cstdint>
 #include <atomic>
 #include <map>
-#include <unordered_map>
-#include "Spscqueue.h"
 #include <memory>
 
 using Price = int32_t;
 using Qty = int32_t;
 using OrderId = uint64_t;
+#define KnuthMultiplier 11400714819323198485ull
 
 enum class Side
 {
     BUY = 0,
     SELL = 1,
 };
+class Order;
+class PriceLevel;
+class Slot
+{
+public:
+    bool empty;
+    bool tombstone;
+    OrderId orderId;
+    Order *order;
+    Slot() : empty(true), tombstone(false), orderId(0), order(nullptr) {};
+    Slot(uint64_t orderID) : empty(true), tombstone(false), orderId(orderID), order(nullptr) {}
+};
+class FlatMap
+{
+public:
+    int32_t capacity;
+    std::vector<Slot> slots;
 
+    FlatMap()
+    {
+        capacity = 1 << 10; // default 1K entries
+        slots.resize(capacity);
+    }
+
+    FlatMap(int32_t capacity) : capacity(capacity)
+    {
+        slots.resize(capacity);
+    }
+
+    inline int32_t hash(OrderId orderId)
+    {
+        return (orderId * KnuthMultiplier) & (capacity - 1);
+    }
+    bool insert(uint64_t orderId, Order *order);
+    Order *find(uint64_t orderId);
+    bool erase(uint64_t orderId);
+};
+
+class Order
+{
+public:
+    uint64_t id;
+    Side side;
+    int32_t price;
+    int32_t qty;
+    Order *prev;
+    Order *next;
+    PriceLevel *level;
+
+    Order(uint64_t id, Side side, int32_t price, int32_t qty)
+        : id(id), side(side), price(price), qty(qty), prev(nullptr), next(nullptr), level(nullptr) {}
+
+    ~Order()
+    {
+        // Clean up any resources if needed
+    }
+};
 class PriceLevel
 {
 public:
@@ -27,10 +83,10 @@ public:
     std::atomic<int32_t> total_qty;
     Order *head;
     Order *tail;
+
     PriceLevel(int32_t price) : price(price), total_qty(0), head(nullptr), tail(nullptr) {}
     ~PriceLevel()
     {
-
         // Clean up all orders in this price level
         Order *current = head;
         while (current)
@@ -39,6 +95,11 @@ public:
             delete current;
             current = next;
         }
+    }
+
+    inline bool empty() const
+    {
+        return head == nullptr;
     }
 
     void append(Order *o)
@@ -56,7 +117,7 @@ public:
         {
             head = o;
             tail = o;
-            total_qty += o->qty;
+            total_qty = o->qty;
             o->level = this;
             return;
         }
@@ -83,45 +144,26 @@ public:
         total_qty -= o->qty;
         o->level = nullptr;
     }
-
-    inline bool empty() const { return head == nullptr; }
-};
-
-class Order
-{
-public:
-    uint64_t id;
-    Side side;
-    int32_t price;
-    int32_t qty;
-    Order *prev;
-    Order *next;
-    std::shared_ptr<PriceLevel> level{nullptr};
-
-    Order(uint64_t id, Side side, int32_t price, int32_t qty)
-        : id(id), side(side), price(price), qty(qty), prev(nullptr), next(nullptr) {}
 };
 
 // OrderBook for one instrument
 
 class OrderBook
 {
-private:
+public:
     std::vector<PriceLevel *> bids; // map/flat_map/array
     std::vector<PriceLevel *> asks;
-    int32 min_price_cents{0};
-    int32 max_price_cents{0};
-    std::unordered_map<OrderId, std::shared_ptr<Order>> orders;
+    int32_t min_price_cents{0};
+    int32_t max_price_cents{0};
+    FlatMap orders; // default 1K orders
 
-public:
     Price best_bid_price{};
     Qty best_bid_qty{};
     Price best_ask_price{};
     Qty best_ask_qty{};
-    OrderBook() = 0;
-    OrderBook(int32_t min_price_cents, int32_t max_price_cents)
-        : min_price_cents(min_price_cents), max_price_cents(max_price_cents)
 
+    OrderBook(Price min_price_cents, Price max_price_cents)
+        : min_price_cents(min_price_cents), max_price_cents(max_price_cents)
     {
         int32_t price_range = max_price_cents - min_price_cents + 1;
         bids.resize(price_range, nullptr);
@@ -148,13 +190,15 @@ public:
         }
     }
 
-    void addOrder(uint64_t id, const std::string &side_str, int32_t price, int32_t qty);
-    void orderExecuted(uint64_t id, int32_t qty);
-    void orderCancel(uint64_t id, int32_t qty);
-    void orderCancelReplace(uint64_t oldId, uint64_t newId, int32_t newPrice, int32_t qty);
-    void orderDelete(uint64_t id);
-    void trade_non_cross(uint64_t orderId, int32_t price, int32_t qty);
-    const std::unordered_map<OrderId, std::shared_ptr<Order>> &getOrders() const { return orders; };
+    bool addOrder(uint64_t id, const std::string &side_str, int32_t price, int32_t qty);
+    bool orderExecuted(uint64_t id, int32_t qty);
+    bool orderCancel(uint64_t id, int32_t qty);
+    bool orderCancelReplace(uint64_t oldId, uint64_t newId, int32_t newPrice, int32_t qty);
+    bool orderDelete(uint64_t id);
+    FlatMap &getOrders()
+    {
+        return orders;
+    }
 };
 
 #endif // OrderBook_H
